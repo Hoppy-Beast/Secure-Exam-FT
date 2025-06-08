@@ -1,0 +1,115 @@
+============================
+✅ Features Already Implemented:
+============================
+
+1. Fullscreen Mode
+   - Exam starts in fullscreen using `requestFullscreen()`
+   - Tracks fullscreen entry/exit
+   - Warns or logs on fullscreen exit
+
+2. Keyboard Shortcut Blocking
+   - Blocks common shortcuts (Ctrl+Shift+I, Ctrl+U, Ctrl+C, etc.)
+   - Still logs attempts even if blocked
+
+3. Multi-Tab Detection
+   - Uses `BroadcastChannel` and `localStorage` to detect duplicate exam tabs/windows
+   - Logs such activities in real-time
+
+4. Focus Monitoring
+   - Uses `visibilitychange` and `blur` events
+   - Tracks when the user switches tabs, minimizes, or moves focus
+   - Logs each focus loss/gain event
+
+5. DevTools Detection
+   - Checks if developer tools are opened by analyzing window size
+   - Logs events when thresholds are violated
+
+6. Right-Click and Clipboard Blocking
+   - Disables context menu
+   - Disables copy-paste keyboard and mouse actions
+
+7. Time Tracking per Question
+   - Logs time spent on each question
+   - Helps evaluate if students are rushing/skipping
+
+8. Gaze Tracking (via MediaPipe)
+   - Uses a preloaded sample video or webcam
+   - ML model checks if user's iris is centered to determine attention
+   - Logs whether the user is focused or distracted
+
+============================
+📄 Logging: Structure and Content
+============================
+
+The final output is stored as a unified JSON log with the following structure:
+
+{
+  "examEvents": {
+    "fullscreen": [],
+    "keyboard": [],
+    "multitab": [],
+    "shortcuts": [],
+    "fullscreenWarnings": [],
+    "devtools": [],
+    "focus": [],
+    "questionTiming": []
+  },
+  "gazeEvents": {
+    "cameraAccess": [],
+    "gaze": []
+  }
+}
+
+➡ examEvents: Contains all security and UI interaction logs  
+➡ gazeEvents: Contains gaze tracking data to analyze screen focus behavior
+
+============================
+🛠️ Changes Made in Code (Exam.html):
+============================
+
+- Code added from line: 508 to 552
+- Code added at line: 652
+
+These cover:
+- Loading and initializing gaze tracking
+- Logging events to `localStorage`
+- Exporting JSON after 25s for testing
+
+============================
+📝 TODO / Features Left to Implement:
+============================
+
+❗ Question Randomization  
+- Both question order and answer options should be randomized (preferably server-side)
+
+❗ IP Address Session Flags  
+- Detect multiple active sessions from the same IP  
+- Useful for identifying suspicious behavior in local networks
+
+❗ Suspend & Submit Functions  
+- anysuspendExam() – Triggered on major rule violations (e.g., 3x fullscreen exit)
+- anyautoSubmitExam() – Automatically submits exam on critical events like devtools open
+
+❗ Student Guidelines + Consent  
+- Display pre-exam disclaimer: “Your activity is being monitored using AI”
+- Mention that multiple violations may lead to exam suspension or auto-submission
+
+❗ Alert System  
+- Show a message when a student breaks a rule: "Warning! You are under observation."
+- Even if tracking isn't real-time via human, perceived monitoring has psychological effect
+
+
+============================
+📦 Additional Notes:
+============================
+
+- This sample project demonstrates how to implement client-side proctoring and monitoring.
+- Log export triggers every 25 seconds (for test purposes).
+- Customize time intervals and security thresholds as needed.
+- Logs can be sent to the backend for further analysis (very useful).
+- For real implementation, remove sample video and enable actual webcam tracking with user permission.
+
+
+💡 Use it to learn, extend, and deploy secure online assessments.
+
+
