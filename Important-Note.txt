@@ -108,8 +108,9 @@ These cover:
 - Customize time intervals and security thresholds as needed.
 - Logs can be sent to the backend for further analysis (very useful).
 - For real implementation, remove sample video and enable actual webcam tracking with user permission.
+- some aspects in the code needs to reviews based on your implementations so it is recommended to review the code.
 
 
-💡 Use it to learn, extend, and deploy secure online assessments.
+💡 Use it to learn, extend, and deploy secure online exams.
 
 
