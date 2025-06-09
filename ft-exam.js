@@ -119,7 +119,7 @@ function toggleFullscreen() {
   };
 
   // Run compliance check four second
-  setInterval(checkCompliance, 4000);
+  setInterval(checkCompliance, POPUP_COOLDOWN_MS + 1000);
 
   // Log fullscreen changes
   document.addEventListener('fullscreenchange', () => {
