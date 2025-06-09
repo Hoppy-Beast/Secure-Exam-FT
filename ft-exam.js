@@ -64,7 +64,7 @@ function toggleFullscreen() {
 (() => {
   const bc = new BroadcastChannel('exam_channel');
   const TAB_KEY = 'exam_tab_open';
-  const POPUP_COOLDOWN_MS = 2000;
+  const POPUP_COOLDOWN_MS = 4000;
 
   let lastPopupTime = 0;
   let isPopupOpen = false;
@@ -118,8 +118,8 @@ function toggleFullscreen() {
     }
   };
 
-  // Run compliance check 2.5 second
-  setInterval(checkCompliance, 2500);
+  // Run compliance check four second
+  setInterval(checkCompliance, 4000);
 
   // Log fullscreen changes
   document.addEventListener('fullscreenchange', () => {
