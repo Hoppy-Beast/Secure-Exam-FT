@@ -1,0 +1,105 @@
+{
+  "examEvents": {
+    "fullscreen": [
+      {
+        "timestamp": "2025-06-09T10:56:02.456Z",
+        "message": "Entered fullscreen mode"
+      },
+      {
+        "timestamp": "2025-06-09T10:56:02.456Z",
+        "message": "Entered fullscreen"
+      },
+      {
+        "timestamp": "2025-06-09T10:56:03.036Z",
+        "message": "Exited fullscreen mode"
+      },
+      {
+        "timestamp": "2025-06-09T10:56:03.928Z",
+        "message": "Exited fullscreen"
+      },
+      {
+        "timestamp": "2025-06-09T10:56:18.583Z",
+        "message": "Entered fullscreen mode"
+      },
+      {
+        "timestamp": "2025-06-09T10:56:18.583Z",
+        "message": "Entered fullscreen"
+      }
+    ],
+    "keyboard": [],
+    "multitab": [
+      {
+        "timestamp": "2025-06-09T10:56:01.248Z",
+        "message": "Broadcasted exam tab opened"
+      },
+      {
+        "timestamp": "2025-06-09T10:56:01.248Z",
+        "message": "Set localStorage tab open flag"
+      }
+    ],
+    "fullscreenWarnings": [
+      {
+        "timestamp": "2025-06-09T10:56:03.928Z",
+        "message": "Fullscreen exit warning 1",
+        "warningCountFullscreenExit": 1
+      }
+    ],
+    "devtools": [],
+    "focus": [
+      {
+        "timestamp": "2025-06-09T10:56:00.392Z",
+        "message": "Window lost focus"
+      },
+      {
+        "timestamp": "2025-06-09T10:56:01.208Z",
+        "message": "⚠️ Window is not fullscreen or not maximized enough"
+      },
+      {
+        "timestamp": "2025-06-09T10:56:01.209Z",
+        "message": "Window lost focus"
+      },
+      {
+        "timestamp": "2025-06-09T10:56:03.930Z",
+        "message": "Window lost focus"
+      },
+      {
+        "timestamp": "2025-06-09T10:56:03.936Z",
+        "message": "⚠️ Window is not fullscreen or not maximized enough"
+      },
+      {
+        "timestamp": "2025-06-09T10:56:10.001Z",
+        "message": "Window lost focus"
+      },
+      {
+        "timestamp": "2025-06-09T10:56:15.184Z",
+        "message": "Window lost focus"
+      }
+    ],
+    "questionTiming": [
+      {
+        "timestamp": "2025-06-09T10:56:12.633Z",
+        "message": "First click on Question 15"
+      },
+      {
+        "timestamp": "2025-06-09T10:56:15.808Z",
+        "message": "Time between clicks for Question 16",
+        "diffMs": 3175
+      }
+    ]
+  },
+  "gazeEvents": {
+    "cameraAccess": [
+      {
+        "timestamp": 1749466551791,
+        "message": "Camera access denied or error",
+        "error": "Requested device not found"
+      },
+      {
+        "timestamp": 1749466559021,
+        "message": "Camera access denied or error",
+        "error": "Requested device not found"
+      }
+    ],
+    "gaze": []
+  }
+}
