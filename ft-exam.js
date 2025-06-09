@@ -60,36 +60,46 @@ function toggleFullscreen() {
   });
 })();
 
-// --- Keyboard Shortcut Blocking & Multi-Tab Detection ---
+// --- Keyboard Shortcut Blocking & Multi-Tab Detection & full screen, visiblity, blur change ---
 (() => {
   const bc = new BroadcastChannel('exam_channel');
   const TAB_KEY = 'exam_tab_open';
-  const MAXIMIZED_THRESHOLD = 0.98;
+  const POPUP_COOLDOWN_MS = 2000;
 
   let lastPopupTime = 0;
   let isPopupOpen = false;
-  const POPUP_COOLDOWN_MS = 2000;
 
   // To avoid redundant logs
   let isNonCompliantLogged = false;
 
+  // Check if fullscreen is active (standard)
   const isFullscreen = () => document.fullscreenElement !== null;
 
-  const isWindowMaximizedEnough = () => {
-    const widthRatio = window.outerWidth / screen.availWidth;
-    const heightRatio = window.outerHeight / screen.availHeight;
-    return widthRatio >= MAXIMIZED_THRESHOLD && heightRatio >= MAXIMIZED_THRESHOLD;
-  };
+  // Mobile-friendly fullscreen check based on viewport vs screen size
+  function isFullScreenEnough() {
+    const heightRatio = window.innerHeight / screen.height;
+    const widthRatio = window.innerWidth / screen.width;
+    // Accept if viewport covers at least 90% height and 95% width of the screen
+    return heightRatio >= 0.9 && widthRatio >= 0.95;
+  }
 
+  // Combined compliance check: fullscreen OR large enough viewport
   const isStrictlyCompliant = () => {
-    return isFullscreen() || isWindowMaximizedEnough();
+    return isFullscreen() || isFullScreenEnough();
   };
 
+  // Show alert if not compliant, with mobile-friendly message
   const showComplianceAlert = () => {
     const now = Date.now();
     if (!isPopupOpen && now - lastPopupTime >= POPUP_COOLDOWN_MS) {
       isPopupOpen = true;
-      alert("Please maximize your browser window or enter fullscreen to continue the exam.");
+
+      // Different message for portrait mobile users
+      const mobileMsg = "📱 Please rotate your device to landscape and enter fullscreen or maximize browser to continue.";
+      const desktopMsg = "Please maximize your browser window or enter fullscreen to continue the exam.";
+      const msg = (window.innerWidth < window.innerHeight) ? mobileMsg : desktopMsg;
+
+      alert(msg);
       lastPopupTime = now;
       isPopupOpen = false;
     }
@@ -103,14 +113,15 @@ function toggleFullscreen() {
         isNonCompliantLogged = true;
       }
     } else {
-      // If user fixes the issue, reset log flag
+      // Reset log flag if compliance restored
       isNonCompliantLogged = false;
     }
   };
 
-  // Continuous check
+  // Run compliance check every second
   setInterval(checkCompliance, 1000);
 
+  // Log fullscreen changes
   document.addEventListener('fullscreenchange', () => {
     if (!isFullscreen()) {
       window.examLogEvent('fullscreen', 'Exited fullscreen');
@@ -119,12 +130,16 @@ function toggleFullscreen() {
     }
   });
 
+  // Check compliance on resize, focus
   window.addEventListener('resize', checkCompliance);
   window.addEventListener('focus', checkCompliance);
+
+  // Log blur event
   window.addEventListener('blur', () => {
     window.examLogEvent('focus', 'Window lost focus');
   });
 
+  // Visibility change events
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       window.examLogEvent('focus', 'Tab hidden (visibilitychange)');
@@ -133,6 +148,7 @@ function toggleFullscreen() {
     }
   });
 
+  // Detect multi-tab exam openings using BroadcastChannel
   bc.onmessage = (event) => {
     if (event.data === 'exam_opened') {
       alert("Multiple exam tabs detected! This is not allowed.");
@@ -148,6 +164,7 @@ function toggleFullscreen() {
     checkCompliance();
   });
 
+  // Detect multi-tab openings using localStorage changes
   window.addEventListener('storage', (e) => {
     if (e.key === TAB_KEY && e.newValue === 'open') {
       alert("Multiple exam tabs detected via localStorage! This is not allowed.");
@@ -155,6 +172,7 @@ function toggleFullscreen() {
     }
   });
 
+  // Cleanup localStorage flag on unload
   window.addEventListener('beforeunload', () => {
     localStorage.removeItem(TAB_KEY);
     window.examLogEvent('multitab', 'Removed localStorage tab open flag');
@@ -249,6 +267,7 @@ function exam_initiated_security() {
   }
 
   // Immediate checks and start intervals
+
   detectDevTools();
   detectDevToolsDebuggerTrap();
   blockDevToolsShortcuts();
