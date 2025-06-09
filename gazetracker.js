@@ -1,19 +1,71 @@
-// Global gaze logs
-window.gazeLogs = window.gazeLogs || {};
+// ============ CONFIG =============
+const LOG_EXPIRY_MS = 30 * 1000; // 30 seconds (for test purpose)
 
-// Gaze logging function
-window.gazeLogEvent = window.gazeLogEvent || function (type, message, data = {}) {
-  if (!window.gazeLogs[type]) window.gazeLogs[type] = [];
-  const entry = {
-    timestamp: new Date().toISOString(),
+const DEFAULT_LOG_STRUCTURES = {
+  examLogs: {
+    fullscreen: [],
+    keyboard: [],
+    multitab: [],
+    fullscreenWarnings: [],
+    devtools: [],
+    focus: [],
+    questionTiming: []
+  },
+  gazeLogs: {
+    cameraAccess: [],
+    gaze: []
+  }
+};
+
+// ============ LOGGING CORE =============
+function loadLogs(type) {
+  const stored = JSON.parse(localStorage.getItem(type)) || {};
+  const cleaned = {};
+  const now = Date.now();
+
+  Object.keys(DEFAULT_LOG_STRUCTURES[type]).forEach(key => {
+    const arr = Array.isArray(stored[key]) ? stored[key] : [];
+    cleaned[key] = arr.filter(entry => now - (entry.timestamp || 0) < LOG_EXPIRY_MS);
+  });
+
+  window[type] = cleaned;
+  localStorage.setItem(type, JSON.stringify(cleaned));
+}
+
+function logEvent(type, subType, message, data = {}) {
+  const logObj = {
+    timestamp: Date.now(),
     message,
     ...data
   };
-  window.gazeLogs[type].push(entry);
-  console.log(`[${type}] ${message}`, data);
-};
 
-// Track focus stats
+  if (!window[type][subType]) window[type][subType] = [];
+  window[type][subType].push(logObj);
+  console.log(`[${subType}] ${message}`, data);
+
+  const now = Date.now();
+  const cleaned = {};
+  Object.keys(window[type]).forEach(key => {
+    const arr = Array.isArray(window[type][key]) ? window[type][key] : [];
+    cleaned[key] = arr.filter(entry => now - (entry.timestamp || 0) < LOG_EXPIRY_MS);
+  });
+
+  localStorage.setItem(type, JSON.stringify(cleaned));
+  window[type] = cleaned;
+}
+
+function all_logs() {
+  window.unifiedExamReport = {
+    examEvents: window.examLogs || {},
+    gazeEvents: window.gazeLogs || {}
+  };
+  return window.unifiedExamReport;
+}
+
+loadLogs("examLogs");
+loadLogs("gazeLogs");
+
+// ============ GAZE TRACKING =============
 const focusStats = {
   focused: 0,
   notFocused: 0,
@@ -26,17 +78,24 @@ function updateFocusStats(isFocused) {
   focusStats.total++;
 }
 
+let lastFocusLogTime = 0;
 function printFocusStats() {
+  const now = Date.now();
   if (focusStats.total === 0) return;
+  const print_interval_seconds = 10;
+  // Only print every 10 seconds
+  if (now - lastFocusLogTime < print_interval_seconds * 1000) return;
+  
+  lastFocusLogTime = now;
   const focusedPercent = ((focusStats.focused / focusStats.total) * 100).toFixed(1);
   const notFocusedPercent = ((focusStats.notFocused / focusStats.total) * 100).toFixed(1);
   console.log(`📊 Focus Stats: Focused: ${focusedPercent}%, Not Focused: ${notFocusedPercent}%`);
 }
 
-// Load MediaPipe FaceMesh
+
 async function loadFaceMesh() {
   await import("https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh");
-  const FaceMesh = window.FaceMesh; // Use from global context
+  const FaceMesh = window.FaceMesh;
 
   const facemesh = new FaceMesh({
     locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
@@ -59,26 +118,24 @@ async function startGazeTracking(useFakeVideo = false, video_width = 320, video_
     if (useFakeVideo) {
       video = document.createElement("video");
       video.style.display = "none";
-      video.src = "gaze-tracking-sample.mp4"; // Replace with a real file
+      video.src = "gaze-tracking-sample.mp4";
       video.autoplay = true;
       video.loop = true;
       video.muted = true;
       video.playsInline = true;
       await video.play();
       document.body.appendChild(video);
-
-      window.gazeLogEvent("cameraAccess", "Fake video loaded for gaze tracking");
+      logEvent("gazeLogs", "cameraAccess", "Fake video loaded for gaze tracking");
     } else {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          width: { ideal: 320, min: 160, max: 480 },     // flexible between 160 and 480, ideally 320
-          height: { ideal: 240, min: 120, max: 360 },    // flexible height range
-          frameRate: { ideal: 15, min: 10, max: 24 },    // low-medium fps to balance smoothness & perf
-          facingMode: "user"                             // front camera if on mobile devices
+          width: { ideal: 320, min: 160, max: 480 },
+          height: { ideal: 240, min: 120, max: 360 },
+          frameRate: { ideal: 15, min: 10, max: 24 },
+          facingMode: "user"
         },
         audio: false
       });
-
 
       video = document.createElement("video");
       video.style.display = "none";
@@ -88,48 +145,68 @@ async function startGazeTracking(useFakeVideo = false, video_width = 320, video_
       video.playsInline = true;
       await video.play();
       document.body.appendChild(video);
-
-      window.gazeLogEvent("cameraAccess", "Camera access granted");
+      logEvent("gazeLogs", "cameraAccess", "Camera access granted");
     }
 
     const facemesh = await loadFaceMesh();
-
-    let lastLogTime = 0;
-    const logThrottleMs = 1000;
+    let latestLandmarks = null;
 
     facemesh.onResults(({ multiFaceLandmarks }) => {
-      if (!multiFaceLandmarks?.length) return;
+      latestLandmarks = multiFaceLandmarks?.[0] || null;
+    });
 
-      const lm = multiFaceLandmarks[0];
+    setInterval(() => {
+      const now = Date.now();
+
+      if (!latestLandmarks) {
+        updateFocusStats(false);
+        logEvent("gazeLogs", "gaze", "No face detected (user might be away or out of frame)");
+        printFocusStats();
+        return;
+      }
+
+      const lm = latestLandmarks;
       const leftEyeOuter = lm[33];
       const leftEyeInner = lm[133];
+      const rightEyeInner = lm[362];
+      const rightEyeOuter = lm[263];
+      const noseTip = lm[1];
       const leftIris = lm[468];
 
       const eyeWidth = leftEyeInner.x - leftEyeOuter.x;
-      if (eyeWidth <= 0) return;
+      if (eyeWidth <= 0) {
+        updateFocusStats(false);
+        logEvent("gazeLogs", "gaze", "Invalid eye width detected (possible tracking error)");
+        printFocusStats();
+        return;
+      }
+
 
       const irisPos = (leftIris.x - leftEyeOuter.x) / eyeWidth;
+      const eyeMidX = (leftEyeInner.x + rightEyeInner.x) / 2;
+      const yawOffset = noseTip.x - eyeMidX;
 
-      // Define "focused" if irisPos is roughly between 0.2 and 0.8 (looking roughly center)
-      const isFocused = irisPos >= 0.2 && irisPos <= 0.8;
+      const headIsTurned = Math.abs(yawOffset) > 0.03;
+      const isLooking = irisPos >= 0.2 && irisPos <= 0.8;
+      const isFocused = isLooking && !headIsTurned;
 
-      const now = Date.now();
-      if (now - lastLogTime > logThrottleMs) {
-        updateFocusStats(isFocused);
-        if (isFocused) {
-          window.gazeLogEvent("gaze", "User is FOCUSED on screen", { irisPos: irisPos.toFixed(3) });
-        } else {
-          window.gazeLogEvent("gaze", "User is NOT focused on screen", { irisPos: irisPos.toFixed(3) });
-        }
+      updateFocusStats(isFocused);
 
-        // Print stats every 5 logs (5 seconds)
-        if (focusStats.total % 5 === 0) {
-          printFocusStats();
-        }
+      const logData = {
+        irisPos: irisPos.toFixed(3),
+        yawOffset: yawOffset.toFixed(3)
+      };
 
-        lastLogTime = now;
+      if (isFocused) {
+        logEvent("gazeLogs", "gaze", "User is FOCUSED on screen", logData);
+      } else if (headIsTurned) {
+        logEvent("gazeLogs", "gaze", "User head is turned (not facing screen)", logData);
+      } else {
+        logEvent("gazeLogs", "gaze", "User eyes are not focused on screen", logData);
       }
-    });
+
+      printFocusStats();
+    }, 1000);
 
     await import("https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js");
     const Camera = window.Camera;
@@ -157,89 +234,12 @@ async function startGazeTracking(useFakeVideo = false, video_width = 320, video_
     }
 
   } catch (e) {
-    window.gazeLogEvent("cameraAccess", "Camera access denied or error", { error: e.message });
+    logEvent("gazeLogs", "cameraAccess", "Camera access denied or error", { error: e.message });
     alert("Camera access is required for gaze tracking.");
   }
 }
 
-// logs management in localstorage and variable
-// Default base structures
-const DEFAULT_LOG_STRUCTURES = {
-  examLogs: {
-    fullscreen: [],
-    keyboard: [],
-    multitab: [],
-    fullscreenWarnings: [],
-    devtools: [],
-    focus: [],
-    questionTiming: []
-  },
-  gazeLogs: {
-    cameraAccess: [],
-    gaze: []
-  }
-};
-
-// Merge two logs based on expected structure
-function mergeLogs(current = {}, stored = {}, type) {
-  const merged = {};
-  const defaultStructure = DEFAULT_LOG_STRUCTURES[type];
-
-  Object.keys(defaultStructure).forEach(key => {
-    const cur = current[key] || [];
-    const sto = stored[key] || [];
-    merged[key] = [...sto, ...cur]; // old first, new later
-  });
-
-  return merged;
-}
-
-function syncLogs(logKey, globalVarName) {
-  const storedLogs = JSON.parse(localStorage.getItem(logKey)) || null;
-  const currentLogs = window[globalVarName] || {};
-
-  let finalLogs;
-  const hasStored = storedLogs && Object.keys(storedLogs).length > 0;
-  const hasCurrent = currentLogs && Object.keys(currentLogs).length > 0;
-
-  if (!hasStored && !hasCurrent) {
-    finalLogs = { ...DEFAULT_LOG_STRUCTURES[globalVarName] };
-  } else if (!hasStored) {
-    finalLogs = mergeLogs(currentLogs, {}, globalVarName);
-  } else if (!hasCurrent) {
-    finalLogs = mergeLogs({}, storedLogs, globalVarName);
-  } else {
-    finalLogs = mergeLogs(currentLogs, storedLogs, globalVarName);
-  }
-
-  window[globalVarName] = finalLogs;
-  localStorage.setItem(logKey, JSON.stringify(finalLogs));
-}
-
-// Run every 30 seconds
-setInterval(() => {
-  syncLogs("examLogs", "examLogs");
-  syncLogs("gazeLogs", "gazeLogs");
-}, 30000);
-
-
-
-
-// Start gaze tracking (true = use sample video; false = use webcam)
-startGazeTracking(false, 320, 240);
-
-// send this to back end for analysis the data
-// or analize here in client side ( not recommended )
-function all_logs() {
-  window.unifiedExamReport = {
-    examEvents: window.examLogs || {},
-    gazeEvents: window.gazeLogs || {}
-  };
-  return window.unifiedExamReport;
-}
-
-
-// test purpose
+// ============ AUTO DOWNLOAD TEST =============
 setTimeout(() => {
   const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(all_logs(), null, 2));
   const downloadAnchor = document.createElement('a');
@@ -249,4 +249,7 @@ setTimeout(() => {
   downloadAnchor.click();
   document.body.removeChild(downloadAnchor);
   console.log("✅ Download triggered for unifiedExamReport.");
-}, 25000); // 25 seconds
+}, 25000);
+
+// ============ START TRACKING ============
+startGazeTracking(true, 320, 240);
