@@ -21,11 +21,14 @@ const DEFAULT_LOG_STRUCTURES = {
 function loadLogs(type) {
   const stored = JSON.parse(localStorage.getItem(type)) || {};
   const cleaned = {};
-  const now = Date.now();
+  const now = new Date();
 
   Object.keys(DEFAULT_LOG_STRUCTURES[type]).forEach(key => {
     const arr = Array.isArray(stored[key]) ? stored[key] : [];
-    cleaned[key] = arr.filter(entry => now - (entry.timestamp || 0) < LOG_EXPIRY_MS);
+    cleaned[key] = arr.filter(entry => {
+      const ts = entry.timestamp ? new Date(entry.timestamp) : null;
+      return ts && (now - ts) < LOG_EXPIRY_MS;
+    });
   });
 
   window[type] = cleaned;
@@ -33,8 +36,9 @@ function loadLogs(type) {
 }
 
 function logEvent(type, subType, message, data = {}) {
+  const now = new Date();
   const logObj = {
-    timestamp: Date.now(),
+    timestamp: now.toISOString(),
     message,
     ...data
   };
@@ -43,11 +47,13 @@ function logEvent(type, subType, message, data = {}) {
   window[type][subType].push(logObj);
   console.log(`[${subType}] ${message}`, data);
 
-  const now = Date.now();
   const cleaned = {};
   Object.keys(window[type]).forEach(key => {
     const arr = Array.isArray(window[type][key]) ? window[type][key] : [];
-    cleaned[key] = arr.filter(entry => now - (entry.timestamp || 0) < LOG_EXPIRY_MS);
+    cleaned[key] = arr.filter(entry => {
+      const ts = entry.timestamp ? new Date(entry.timestamp) : null;
+      return ts && (now - ts) < LOG_EXPIRY_MS;
+    });
   });
 
   localStorage.setItem(type, JSON.stringify(cleaned));
@@ -65,53 +71,72 @@ function all_logs() {
 loadLogs("examLogs");
 loadLogs("gazeLogs");
 
-// ============ GAZE TRACKING =============
-const focusStats = {
-  focused: 0,
-  notFocused: 0,
-  total: 0
-};
+// ============ GAZE TRACKING (UPDATED) =============
+const FRAME_WIDTH = 320;
+const FRAME_HEIGHT = 240;
+const BUFFER_SIZE = 15;
+const directionBuffer = [];
+const LEFT_EYE_LANDMARKS = [33, 133, 159, 145];
+const RIGHT_EYE_LANDMARKS = [362, 263, 386, 374];
+const THRESHOLD_IRIS_POS = 0.15;
+const HEAD_TURN_THRESHOLD = 0.05;
 
-function updateFocusStats(isFocused) {
-  if (isFocused) focusStats.focused++;
-  else focusStats.notFocused++;
-  focusStats.total++;
+function smoothDirection() {
+  if (directionBuffer.length < BUFFER_SIZE) return "unknown";
+  const counts = {};
+  directionBuffer.forEach(dir => counts[dir] = (counts[dir] || 0) + 1);
+  return Object.entries(counts).reduce((a, b) => a[1] > b[1] ? a : b)[0];
 }
 
-let lastFocusLogTime = 0;
-function printFocusStats() {
-  const now = Date.now();
-  if (focusStats.total === 0) return;
-  const print_interval_seconds = 10;
-  // Only print every 10 seconds
-  if (now - lastFocusLogTime < print_interval_seconds * 1000) return;
-  
-  lastFocusLogTime = now;
-  const focusedPercent = ((focusStats.focused / focusStats.total) * 100).toFixed(1);
-  const notFocusedPercent = ((focusStats.notFocused / focusStats.total) * 100).toFixed(1);
-  console.log(`📊 Focus Stats: Focused: ${focusedPercent}%, Not Focused: ${notFocusedPercent}%`);
+function getEyeBox(landmarks, indices) {
+  return {
+    left: landmarks[indices[0]].x,
+    right: landmarks[indices[1]].x,
+    top: landmarks[indices[2]].y,
+    bottom: landmarks[indices[3]].y,
+    width: landmarks[indices[1]].x - landmarks[indices[0]].x,
+    height: landmarks[indices[3]].y - landmarks[indices[2]].y,
+  };
 }
 
+function getNormalizedIrisPos(iris, eyeBox) {
+  return {
+    x: (iris.x - eyeBox.left) / eyeBox.width,
+    y: (iris.y - eyeBox.top) / eyeBox.height,
+  };
+}
+
+function isHeadTurned(noseTip, eyeCenter) {
+  const yaw = noseTip.x - eyeCenter.x;
+  return Math.abs(yaw) > HEAD_TURN_THRESHOLD;
+}
+
+function detectGazeDirectionByIrisPos(leftIrisPos, rightIrisPos) {
+  const avgX = (leftIrisPos.x + rightIrisPos.x) / 2;
+  const avgY = (leftIrisPos.y + rightIrisPos.y) / 2;
+  if (avgY < 0.5 - THRESHOLD_IRIS_POS) return "up";
+  if (avgY > 0.5 + THRESHOLD_IRIS_POS) return "down";
+  if (avgX < 0.5 - THRESHOLD_IRIS_POS) return "left";
+  if (avgX > 0.5 + THRESHOLD_IRIS_POS) return "right";
+  return "center";
+}
 
 async function loadFaceMesh() {
   await import("https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh");
   const FaceMesh = window.FaceMesh;
-
   const facemesh = new FaceMesh({
     locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
   });
-
   facemesh.setOptions({
     maxNumFaces: 1,
     refineLandmarks: true,
     minDetectionConfidence: 0.7,
     minTrackingConfidence: 0.7
   });
-
   return facemesh;
 }
 
-async function startGazeTracking(useFakeVideo = false, video_width = 320, video_height = 240) {
+async function startGazeTracking(useFakeVideo = false) {
   try {
     let video;
 
@@ -125,7 +150,7 @@ async function startGazeTracking(useFakeVideo = false, video_width = 320, video_
       video.playsInline = true;
       await video.play();
       document.body.appendChild(video);
-      logEvent("gazeLogs", "cameraAccess", "Fake video loaded for gaze tracking");
+      logEvent("gazeLogs", "cameraAccess", "Fake video loaded");
     } else {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -150,74 +175,87 @@ async function startGazeTracking(useFakeVideo = false, video_width = 320, video_
 
     const facemesh = await loadFaceMesh();
     let latestLandmarks = null;
-
     facemesh.onResults(({ multiFaceLandmarks }) => {
       latestLandmarks = multiFaceLandmarks?.[0] || null;
     });
 
-    setInterval(() => {
+    const directionBuffer = [];
+    const BUFFER_SIZE = 5;
+    const LOG_INTERVAL = 1000; // 1 second
+    const COOLDOWN_MS = 5000;
+
+    let lastLogTime = 0;
+    let lastLoggedDirection = null;
+    const directionCooldown = {};
+
+    function smoothDirection() {
+      const counts = {};
+      for (const dir of directionBuffer) {
+        counts[dir] = (counts[dir] || 0) + 1;
+      }
+      return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || "unknown";
+    }
+
+    async function processFrame() {
       const now = Date.now();
+      let currentDirection = "unknown";
 
-      if (!latestLandmarks) {
-        updateFocusStats(false);
-        logEvent("gazeLogs", "gaze", "No face detected (user might be away or out of frame)");
-        printFocusStats();
-        return;
+      if (latestLandmarks) {
+        const lm = latestLandmarks;
+        const leftEyeBox = getEyeBox(lm, LEFT_EYE_LANDMARKS);
+        const rightEyeBox = getEyeBox(lm, RIGHT_EYE_LANDMARKS);
+        const leftIrisPos = getNormalizedIrisPos(lm[468], leftEyeBox);
+        const rightIrisPos = getNormalizedIrisPos(lm[473], rightEyeBox);
+
+        const eyeCenter = {
+          x: (lm[33].x + lm[133].x + lm[362].x + lm[263].x) / 4,
+          y: (lm[33].y + lm[133].y + lm[362].y + lm[263].y) / 4
+        };
+
+        const noseTip = lm[1];
+        const turned = isHeadTurned(noseTip, eyeCenter);
+
+        if (!turned) {
+          currentDirection = detectGazeDirectionByIrisPos(leftIrisPos, rightIrisPos);
+        }
       }
 
-      const lm = latestLandmarks;
-      const leftEyeOuter = lm[33];
-      const leftEyeInner = lm[133];
-      const rightEyeInner = lm[362];
-      const rightEyeOuter = lm[263];
-      const noseTip = lm[1];
-      const leftIris = lm[468];
+      directionBuffer.push(currentDirection);
+      if (directionBuffer.length > BUFFER_SIZE) directionBuffer.shift();
 
-      const eyeWidth = leftEyeInner.x - leftEyeOuter.x;
-      if (eyeWidth <= 0) {
-        updateFocusStats(false);
-        logEvent("gazeLogs", "gaze", "Invalid eye width detected (possible tracking error)");
-        printFocusStats();
-        return;
+      const smoothDir = smoothDirection();
+
+      if (
+        now - lastLogTime >= LOG_INTERVAL &&
+        smoothDir !== "unknown" &&
+        (!directionCooldown[smoothDir] || now - directionCooldown[smoothDir] > COOLDOWN_MS)
+      ) {
+        const message = smoothDir === "center"
+          ? "User is looking at the screen"
+          : "User eyes are not focused on screen";
+
+        const logData = {
+          timestamp: new Date().toISOString(),
+          direction: smoothDir
+        };
+
+        logEvent("gazeLogs", "gaze", message, logData);
+        directionCooldown[smoothDir] = now;
+        lastLogTime = now;
+        lastLoggedDirection = smoothDir;
       }
 
-
-      const irisPos = (leftIris.x - leftEyeOuter.x) / eyeWidth;
-      const eyeMidX = (leftEyeInner.x + rightEyeInner.x) / 2;
-      const yawOffset = noseTip.x - eyeMidX;
-
-      const headIsTurned = Math.abs(yawOffset) > 0.03;
-      const isLooking = irisPos >= 0.2 && irisPos <= 0.8;
-      const isFocused = isLooking && !headIsTurned;
-
-      updateFocusStats(isFocused);
-
-      const logData = {
-        irisPos: irisPos.toFixed(3),
-        yawOffset: yawOffset.toFixed(3)
-      };
-
-      if (isFocused) {
-        logEvent("gazeLogs", "gaze", "User is FOCUSED on screen", logData);
-      } else if (headIsTurned) {
-        logEvent("gazeLogs", "gaze", "User head is turned (not facing screen)", logData);
-      } else {
-        logEvent("gazeLogs", "gaze", "User eyes are not focused on screen", logData);
-      }
-
-      printFocusStats();
-    }, 1000);
-
-    await import("https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js");
-    const Camera = window.Camera;
+      requestAnimationFrame(processFrame);
+    }
 
     if (!useFakeVideo) {
+      const { Camera } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js");
       const camera = new Camera(video, {
         onFrame: async () => {
           await facemesh.send({ image: video });
         },
-        width: video_width,
-        height: video_height
+        width: 320,
+        height: 240
       });
       camera.start();
 
@@ -226,16 +264,17 @@ async function startGazeTracking(useFakeVideo = false, video_width = 320, video_
         else camera.start();
       });
     } else {
-      const processFrame = async () => {
+      async function loop() {
         await facemesh.send({ image: video });
-        requestAnimationFrame(processFrame);
-      };
-      processFrame();
+        requestAnimationFrame(loop);
+      }
+      loop();
     }
 
+    processFrame();
   } catch (e) {
-    logEvent("gazeLogs", "cameraAccess", "Camera access denied or error", { error: e.message });
-    alert("Camera access is required for gaze tracking.");
+    logEvent("gazeLogs", "cameraAccess", "Camera error", { error: e.message });
+    alert("Camera access is denied ( suspicious )");
   }
 }
 
@@ -252,4 +291,4 @@ setTimeout(() => {
 }, 25000);
 
 // ============ START TRACKING ============
-startGazeTracking(false, 320, 240);
+startGazeTracking(false);
