@@ -291,4 +291,4 @@ setTimeout(() => {
 }, 25000);
 
 // ============ START TRACKING ============
-startGazeTracking(false);
+startGazeTracking(true);
