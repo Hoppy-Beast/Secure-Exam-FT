@@ -39,11 +39,5 @@ This project implements a secure exam interface enhanced with gaze tracking to m
 
 ---
 
-## Contribution
-Feel free to open issues or pull requests for improvements or bug fixes.
 
----
-
-## License
-Specify your license here (e.g., MIT, Apache 2.0, etc.)
 
