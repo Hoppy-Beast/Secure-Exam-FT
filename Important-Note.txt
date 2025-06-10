@@ -2,78 +2,84 @@
 ✅ Features Already Implemented:
 ============================
 
-1. Fullscreen Mode
-   - Exam starts in fullscreen using `requestFullscreen()`
-   - Tracks fullscreen entry/exit
-   - Warns or logs on fullscreen exit
+1. Fullscreen Mode Enforcement
+   - Exam attempts to start in fullscreen via `requestFullscreen()`
+   - Monitors fullscreen entry and exit events
+   - Warns user on exiting fullscreen multiple times
+   - Checks if window size meets minimum fullscreen-like thresholds (height ≥ 90%, width ≥ 95%)
+   - Works on desktop and mobile (detects landscape orientation)
 
-2. Keyboard Shortcut Blocking
-   - Blocks common shortcuts (Ctrl+Shift+I, Ctrl+U, Ctrl+C, etc.)
-   - Still logs attempts even if blocked
+2. Keyboard and Clipboard Blocking
+   - Blocks right-click context menu
+   - Blocks copy, cut, paste events (Ctrl+C, Ctrl+X, Ctrl+V)
+   - Blocks developer tools shortcuts (Ctrl+Shift+I/J, F12, Ctrl+U, Ctrl+S)
+   - Logs all keyboard violations
 
 3. Multi-Tab Detection
-   - Uses `BroadcastChannel` and `localStorage` to detect duplicate exam tabs/windows
-   - Logs such activities in real-time
+   - Uses `BroadcastChannel` and `localStorage` to detect multiple exam tabs/windows open simultaneously
+   - Alerts user and logs multi-tab activity in real-time
 
 4. Focus Monitoring
-   - Uses `visibilitychange` and `blur` events
-   - Tracks when the user switches tabs, minimizes, or moves focus
-   - Logs each focus loss/gain event
+   - Listens for `visibilitychange`, `blur`, and `focus` events
+   - Logs when user switches tabs, minimizes, or loses focus on exam tab
 
-5. DevTools Detection
-   - Checks if developer tools are opened by analyzing window size
-   - Logs events when thresholds are violated
+5. Question Time Tracking (Partial)
+   - Tracks time spent on each exam question
+   - Logs time intervals for analytics (implementation present but could be extended)
 
-6. Right-Click and Clipboard Blocking
-   - Disables context menu
-   - Disables copy-paste keyboard and mouse actions
-
-7. Time Tracking per Question
-   - Logs time spent on each question
-   - Helps evaluate if students are rushing/skipping
-
-8. Gaze Tracking (via MediaPipe)
-   - Uses a preloaded sample video or webcam
-   - ML model checks if user's iris is centered to determine attention
-   - Logs whether the user is focused or distracted
+6. Gaze Tracking with MediaPipe FaceMesh
+   - Uses MediaPipe FaceMesh model to detect iris position and gaze direction
+   - Supports webcam or pre-recorded video input for testing
+   - Smooths gaze data over a buffer of recent frames for stability
+   - Detects gaze direction (center, left, right, up, down, unknown)
+   - Logs gaze direction with timestamps and cooldown to avoid duplicate logs
+   - Automatically exports gaze and exam logs as JSON after 10 seconds (demo/test)
 
 ============================
 📄 Logging: Structure and Content
 ============================
 
-The final output is stored as a unified JSON log with the following structure:
+The system maintains two main log categories:
 
 {
   "examEvents": {
-    "fullscreen": [],
-    "keyboard": [],
-    "multitab": [],
-    "shortcuts": [],
-    "fullscreenWarnings": [],
-    "devtools": [],
-    "focus": [],
-    "questionTiming": []
+    "fullscreen": [],          // Fullscreen enter/exit events
+    "keyboard": [],            // Keyboard shortcut and clipboard violations
+    "multitab": [],            // Multiple tabs detected
+    "fullscreenWarnings": [],  // User warnings about fullscreen exit
+    "focus": [],               // Tab/window focus and blur events
+    "questionTiming": []       // Timing per question events
   },
   "gazeEvents": {
-    "cameraAccess": [],
-    "gaze": []
+    "cameraAccess": [],        // Camera/video start and access logs
+    "gaze": []                 // Gaze direction data (center, left, right, etc.)
   }
 }
 
-➡ examEvents: Contains all security and UI interaction logs  
-➡ gazeEvents: Contains gaze tracking data to analyze screen focus behavior
+➡ Logs are persisted in `localStorage` with expiration (30 seconds TTL)  
+➡ Logs are merged and cleaned regularly to remove stale data  
+➡ Logs are saved under keys: `examLogs` and `gazeLogs`  
 
 ============================
-🛠️ Changes Made in Code (Exam.html):
+🛠️ Changes Made in Code:
 ============================
 
-- Code added from line: 508 to 552
-- Code added at line: 652
+- Exam.html
+- Code added from line: 284 to 287 ( two library )
+- Code added from line: 570 to 622 ( extra code )
+- Code added from line: 634 to 640 ( full screen )
 
-These cover:
-- Loading and initializing gaze tracking
-- Logging events to `localStorage`
-- Exporting JSON after 25s for testing
+- ft-exam.js
+- Fullscreen enforcement and warning code 
+- Keyboard and clipboard event blocking and logging 
+- Multi-tab detection using BroadcastChannel and localStorage 
+- Focus and visibility event listeners 
+- Question timer initialization and partial logging 
+
+
+- gazetracker.js
+- MediaPipe FaceMesh gaze tracking setup and processing logic
+- Automatic JSON export of combined logs after 25 seconds
 
 ============================
 📝 TODO / Features Left to Implement:
@@ -103,14 +109,12 @@ These cover:
 📦 Additional Notes:
 ============================
 
-- This sample project demonstrates how to implement client-side proctoring and monitoring.
-- Log export triggers every 25 seconds (for test purposes).
-- Customize time intervals and security thresholds as needed.
-- Logs can be sent to the backend for further analysis (very useful).
-- For real implementation, remove sample video and enable actual webcam tracking with user permission.
-- some aspects in the code needs to reviews based on your implementations so it is recommended to review the code.
+- The code demonstrates client-side proctoring using a mix of browser APIs and ML  
+- Logs are stored locally and exported as JSON for review or backend upload  
+- Time intervals, cooldowns, and thresholds can be customized per exam policy  
+- Gaze tracking is experimental; accuracy depends on lighting, camera quality  
+- DevTools detection is basic; advanced techniques can be added  
+- Review security and privacy compliance before deploying in production  
+- This setup can be extended for remote online exams with added server-side verification  
 
-
-💡 Use it to learn, extend, and deploy secure online exams.
-
-
+💡 Use this as a foundation to build a robust AI-powered online exam proctoring system.
