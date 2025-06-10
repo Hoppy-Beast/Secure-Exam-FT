@@ -89,20 +89,18 @@ function detectGazeDirectionByIrisPos(leftIrisPos, rightIrisPos) {
 
 async function startGazeTracking(useFakeVideo = false) {
   try {
-    let video;
     const video_width = 320;
     const video_height = 240;
+    let video = videoEl;
 
     if (useFakeVideo) {
-      video = document.createElement("video");
-      video.style.display = "none";
       video.src = "/Secure-Exam-FT/gaze-tracking-sample.mp4";
       video.autoplay = true;
       video.loop = true;
       video.muted = true;
       video.playsInline = true;
+      video.style.display = "block"; // visible
       await video.play();
-      document.body.appendChild(video);
       logEvent("gazeLogs", "cameraAccess", "Fake video loaded");
     } else {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -115,14 +113,12 @@ async function startGazeTracking(useFakeVideo = false) {
         audio: false
       });
 
-      video = document.createElement("video");
-      video.style.display = "none";
       video.srcObject = stream;
       video.autoplay = true;
       video.muted = true;
       video.playsInline = true;
+      video.style.display = "block"; // visible
       await video.play();
-      document.body.appendChild(video);
       logEvent("gazeLogs", "cameraAccess", "Camera access granted");
     }
 
@@ -176,6 +172,7 @@ async function startGazeTracking(useFakeVideo = false) {
       if (directionBuffer.length > BUFFER_SIZE) directionBuffer.shift();
 
       const smoothDir = smoothDirection();
+      updateStatus(smoothDir);
 
       if (
         now - lastLogTime >= LOG_INTERVAL &&
@@ -229,7 +226,6 @@ async function startGazeTracking(useFakeVideo = false) {
     alert("Camera access is denied (suspicious)");
   }
 }
-
 
 startBtn.addEventListener("click", () => {
   startBtn.disabled = true;
