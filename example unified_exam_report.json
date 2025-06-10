@@ -2,104 +2,94 @@
   "examEvents": {
     "fullscreen": [
       {
-        "timestamp": "2025-06-09T10:56:02.456Z",
+        "timestamp": "2025-06-10T12:20:00.867Z",
         "message": "Entered fullscreen mode"
       },
       {
-        "timestamp": "2025-06-09T10:56:02.456Z",
-        "message": "Entered fullscreen"
-      },
-      {
-        "timestamp": "2025-06-09T10:56:03.036Z",
-        "message": "Exited fullscreen mode"
-      },
-      {
-        "timestamp": "2025-06-09T10:56:03.928Z",
-        "message": "Exited fullscreen"
-      },
-      {
-        "timestamp": "2025-06-09T10:56:18.583Z",
-        "message": "Entered fullscreen mode"
-      },
-      {
-        "timestamp": "2025-06-09T10:56:18.583Z",
+        "timestamp": "2025-06-10T12:20:00.867Z",
         "message": "Entered fullscreen"
       }
     ],
     "keyboard": [],
     "multitab": [
       {
-        "timestamp": "2025-06-09T10:56:01.248Z",
+        "timestamp": "2025-06-10T12:19:43.988Z",
         "message": "Broadcasted exam tab opened"
       },
       {
-        "timestamp": "2025-06-09T10:56:01.248Z",
+        "timestamp": "2025-06-10T12:19:43.988Z",
         "message": "Set localStorage tab open flag"
       }
     ],
-    "fullscreenWarnings": [
-      {
-        "timestamp": "2025-06-09T10:56:03.928Z",
-        "message": "Fullscreen exit warning 1",
-        "warningCountFullscreenExit": 1
-      }
-    ],
+    "fullscreenWarnings": [],
     "devtools": [],
     "focus": [
       {
-        "timestamp": "2025-06-09T10:56:00.392Z",
-        "message": "Window lost focus"
-      },
-      {
-        "timestamp": "2025-06-09T10:56:01.208Z",
+        "timestamp": "2025-06-10T12:19:46.246Z",
         "message": "⚠️ Window is not fullscreen or not maximized enough"
       },
       {
-        "timestamp": "2025-06-09T10:56:01.209Z",
+        "timestamp": "2025-06-10T12:19:46.252Z",
         "message": "Window lost focus"
       },
       {
-        "timestamp": "2025-06-09T10:56:03.930Z",
+        "timestamp": "2025-06-10T12:19:57.522Z",
         "message": "Window lost focus"
       },
       {
-        "timestamp": "2025-06-09T10:56:03.936Z",
-        "message": "⚠️ Window is not fullscreen or not maximized enough"
-      },
-      {
-        "timestamp": "2025-06-09T10:56:10.001Z",
-        "message": "Window lost focus"
-      },
-      {
-        "timestamp": "2025-06-09T10:56:15.184Z",
+        "timestamp": "2025-06-10T12:19:59.063Z",
         "message": "Window lost focus"
       }
     ],
     "questionTiming": [
       {
-        "timestamp": "2025-06-09T10:56:12.633Z",
-        "message": "First click on Question 15"
+        "timestamp": "2025-06-10T12:20:03.839Z",
+        "message": "First click on Question 1"
       },
       {
-        "timestamp": "2025-06-09T10:56:15.808Z",
-        "message": "Time between clicks for Question 16",
-        "diffMs": 3175
+        "timestamp": "2025-06-10T12:20:06.102Z",
+        "message": "Time between clicks for Question 2",
+        "diffMs": 2263
+      },
+      {
+        "timestamp": "2025-06-10T12:20:06.302Z",
+        "message": "Time between clicks for Question 3",
+        "diffMs": 2763
       }
     ]
   },
   "gazeEvents": {
     "cameraAccess": [
       {
-        "timestamp": 1749466551791,
-        "message": "Camera access denied or error",
-        "error": "Requested device not found"
+        "timestamp": "2025-06-10T12:19:20.621Z",
+        "message": "Camera access granted"
       },
       {
-        "timestamp": 1749466559021,
-        "message": "Camera access denied or error",
-        "error": "Requested device not found"
+        "timestamp": "2025-06-10T12:19:46.316Z",
+        "message": "Camera access granted"
       }
     ],
-    "gaze": []
+    "gaze": [
+      {
+        "timestamp": "2025-06-10T12:19:20.633Z",
+        "message": "User gaze direction unknown",
+        "direction": "unknown"
+      },
+      {
+        "timestamp": "2025-06-10T12:19:21.638Z",
+        "message": "User is looking at the screen",
+        "direction": "center"
+      },
+      {
+        "timestamp": "2025-06-10T12:19:46.330Z",
+        "message": "User gaze direction unknown",
+        "direction": "unknown"
+      },
+      {
+        "timestamp": "2025-06-10T12:19:47.358Z",
+        "message": "User is looking at the screen",
+        "direction": "center"
+      }
+    ]
   }
 }
