@@ -6,23 +6,28 @@ const videoEl = document.getElementById("tracking-video");
 const FRAME_WIDTH = 320;
 const FRAME_HEIGHT = 240;
 
-const BUFFER_SIZE = 5;
+const BUFFER_SIZE = 3; // Speeds up responsiveness to center
 const directionBuffer = [];
 
 const DIRECTION_ICONS = {
   center: "✅ Looking Center",
-  up: "👆 Looking Up",
-  down: "👇 Looking Down",
-  left: "👈 Looking Left",
-  right: "👉 Looking Right",
-  unknown: "❓ Unknown",
+  up:     "👆 Looking Up",
+  down:   "👇 Looking Down",
+  left:   "👈 Looking Left",
+  right:  "👉 Looking Right",
+  unknown:"❓ Unknown",
 };
 
-const LEFT_EYE_LANDMARKS = [33, 133, 159, 145];
-const RIGHT_EYE_LANDMARKS = [362, 263, 386, 374];
+// Use extended sets of landmarks for better eye box calculation
+const LEFT_EYE_POINTS  = [33, 133, 159, 145, 160, 144, 153, 154];
+const RIGHT_EYE_POINTS = [362, 263, 386, 374, 387, 373, 380, 381];
 
-const THRESHOLD_IRIS_POS = 0.2; // More forgiving center detection
-const HEAD_TURN_THRESHOLD = 0.05;
+// Iris landmark indices — try swapping if needed
+const LEFT_IRIS = 468;
+const RIGHT_IRIS = 473;
+
+const THRESHOLD_IRIS_POS    = 0.23;  // forgiving margin around center (tweak if needed)
+const HEAD_TURN_THRESHOLD  = 0.08; // tolerate a bit of yaw
 
 function logEvent(...args) {
   console.log(...args);
@@ -35,8 +40,8 @@ function updateStatus(direction) {
 function smoothDirection() {
   if (directionBuffer.length < BUFFER_SIZE) return "unknown";
   const counts = {};
-  directionBuffer.forEach(dir => counts[dir] = (counts[dir] || 0) + 1);
-  return Object.entries(counts).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+  directionBuffer.forEach(dir => counts[dir] = (counts[dir]||0) + 1);
+  return Object.entries(counts).reduce((a, b) => a[1]>b[1]?a:b)[0];
 }
 
 async function loadFaceMesh() {
@@ -54,26 +59,28 @@ async function loadFaceMesh() {
   return facemesh;
 }
 
+// Improved eye box function with min/max approach
 function getEyeBox(landmarks, indices) {
-  const leftCorner = landmarks[indices[0]];
-  const rightCorner = landmarks[indices[1]];
-  const upperEyelid = landmarks[indices[2]];
-  const lowerEyelid = landmarks[indices[3]];
-
+  const xs = indices.map(i => landmarks[i].x);
+  const ys = indices.map(i => landmarks[i].y);
   return {
-    left: leftCorner.x,
-    right: rightCorner.x,
-    top: upperEyelid.y,
-    bottom: lowerEyelid.y,
-    width: rightCorner.x - leftCorner.x,
-    height: lowerEyelid.y - upperEyelid.y,
+    left: Math.min(...xs),
+    right: Math.max(...xs),
+    top: Math.min(...ys),
+    bottom: Math.max(...ys),
+    width: Math.max(...xs) - Math.min(...xs),
+    height: Math.max(...ys) - Math.min(...ys)
   };
+}
+
+function clamp(v, min=0, max=1) {
+  return Math.min(max, Math.max(min, v));
 }
 
 function getNormalizedIrisPos(iris, eyeBox) {
   return {
-    x: (iris.x - eyeBox.left) / eyeBox.width,
-    y: (iris.y - eyeBox.top) / eyeBox.height,
+    x: clamp((iris.x - eyeBox.left) / eyeBox.width),
+    y: clamp((iris.y - eyeBox.top) / eyeBox.height)
   };
 }
 
@@ -84,97 +91,80 @@ function isHeadTurned(noseTip, eyeCenter) {
 function detectGazeDirectionByIrisPos(leftIrisPos, rightIrisPos) {
   const avgX = (leftIrisPos.x + rightIrisPos.x) / 2;
   const avgY = (leftIrisPos.y + rightIrisPos.y) / 2;
+  const xOff = avgX - 0.5;
+  const yOff = avgY - 0.5;
+  const m = THRESHOLD_IRIS_POS;
 
-  const xOffset = avgX - 0.5;
-  const yOffset = avgY - 0.5;
-
-  // console.log("avgX:", avgX.toFixed(2), "avgY:", avgY.toFixed(2));
-
-  const margin = THRESHOLD_IRIS_POS;
-
-  if (Math.abs(xOffset) < margin && Math.abs(yOffset) < margin) {
-    return "center";
-  }
-
-  if (yOffset < -margin) return "up";
-  if (yOffset > margin) return "down";
-  if (xOffset < -margin) return "left";
-  if (xOffset > margin) return "right";
-
-  return "center";
+  if (Math.abs(xOff) < m && Math.abs(yOff) < m) return "center";
+  if (yOff < -m) return "up";
+  if (yOff >  m) return "down";
+  if (xOff < -m) return "left";
+  if (xOff >  m) return "right";
+  return "unknown";
 }
 
 async function startGazeTracking(useFakeVideo = false) {
   try {
     let video = videoEl;
-
     if (useFakeVideo) {
-      video.src = "/Secure-Exam-FT/gaze-tracking-sample.mp4";
-      video.autoplay = true;
-      video.loop = true;
-      video.muted = true;
-      video.playsInline = true;
+      video.src = "/Secure-Exam_FT/gaze-tracking-sample.mp4";
+      video.autoplay = video.loop = video.muted = video.playsInline = true;
       video.style.display = "block";
-      await video.play().catch(() => alert("Failed to play the fake video."));
-      logEvent("gazeLogs", "cameraAccess", "Fake video loaded");
+      await video.play().catch(() => alert("Failed to play fake video."));
+      logEvent("gazeLogs","cameraAccess","Fake video loaded");
     } else {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: FRAME_WIDTH, min: 160, max: 480 },
-          height: { ideal: FRAME_HEIGHT, min: 120, max: 360 },
-          frameRate: { ideal: 15, min: 10, max: 24 },
-          facingMode: "user"
-        },
-        audio: false
+        video:{
+          width:{ideal:FRAME_WIDTH,min:160,max:480},
+          height:{ideal:FRAME_HEIGHT,min:120,max:360},
+          frameRate:{ideal:15,min:10,max:24},
+          facingMode:"user"
+        }, audio:false
       });
-
       video.srcObject = stream;
-      video.autoplay = true;
-      video.muted = true;
-      video.playsInline = true;
+      video.autoplay = video.muted = video.playsInline = true;
       video.style.display = "block";
       await video.play();
-      logEvent("gazeLogs", "cameraAccess", "Camera access granted");
+      logEvent("gazeLogs","cameraAccess","Camera access granted");
     }
 
     const facemesh = await loadFaceMesh();
     let latestLandmarks = null;
-    facemesh.onResults(({ multiFaceLandmarks }) => {
+    facemesh.onResults(({multiFaceLandmarks}) => {
       latestLandmarks = multiFaceLandmarks?.[0] || null;
     });
 
     directionBuffer.length = 0;
-    const LOG_INTERVAL = 1000;
-    const COOLDOWN_MS = 5000;
-    let lastLogTime = 0;
-    const directionCooldown = {};
+    const LOG_INTERVAL = 1000, COOLDOWN_MS = 5000;
+    let lastLogTime = 0, directionCooldown = {};
 
     async function processFrame() {
       const now = Date.now();
-      let currentDirection = "unknown";
+      let dir = "unknown";
 
       if (latestLandmarks) {
         const lm = latestLandmarks;
-        const leftEyeBox = getEyeBox(lm, LEFT_EYE_LANDMARKS);
-        const rightEyeBox = getEyeBox(lm, RIGHT_EYE_LANDMARKS);
 
-        const leftIrisPos = getNormalizedIrisPos(lm[472], leftEyeBox);
-        const rightIrisPos = getNormalizedIrisPos(lm[468], rightEyeBox);
+        const leftBox  = getEyeBox(lm, LEFT_EYE_POINTS);
+        const rightBox = getEyeBox(lm, RIGHT_EYE_POINTS);
+
+        const leftIris  = getNormalizedIrisPos(lm[LEFT_IRIS], leftBox);
+        const rightIris = getNormalizedIrisPos(lm[RIGHT_IRIS], rightBox);
+
+        // Debug logs - comment out if too noisy
+        // console.log("Iris avg pos:", ((leftIris.x + rightIris.x)/2).toFixed(2), ((leftIris.y + rightIris.y)/2).toFixed(2));
 
         const eyeCenter = {
-          x: (lm[33].x + lm[133].x + lm[362].x + lm[263].x) / 4,
-          y: (lm[33].y + lm[133].y + lm[362].y + lm[263].y) / 4
+          x: (lm[33].x + lm[133].x + lm[362].x + lm[263].x)/4,
+          y: (lm[33].y + lm[133].y + lm[362].y + lm[263].y)/4
         };
 
-        const noseTip = lm[1];
-        const turned = isHeadTurned(noseTip, eyeCenter);
-
-        if (!turned) {
-          currentDirection = detectGazeDirectionByIrisPos(leftIrisPos, rightIrisPos);
+        if (!isHeadTurned(lm[1], eyeCenter)) {
+          dir = detectGazeDirectionByIrisPos(leftIris, rightIris);
         }
       }
 
-      directionBuffer.push(currentDirection);
+      directionBuffer.push(dir);
       if (directionBuffer.length > BUFFER_SIZE) directionBuffer.shift();
 
       const smoothDir = smoothDirection();
@@ -185,15 +175,10 @@ async function startGazeTracking(useFakeVideo = false) {
         smoothDir !== "unknown" &&
         (!directionCooldown[smoothDir] || now - directionCooldown[smoothDir] > COOLDOWN_MS)
       ) {
-        const message = smoothDir === "center"
+        const msg = smoothDir === "center"
           ? "User is looking at the screen"
           : "User eyes are not focused on screen";
-
-        const logData = {
-          direction: smoothDir
-        };
-
-        logEvent("gazeLogs", "gaze", message, logData);
+        logEvent("gazeLogs","gaze",msg,{direction:smoothDir});
         directionCooldown[smoothDir] = now;
         lastLogTime = now;
       }
@@ -201,36 +186,28 @@ async function startGazeTracking(useFakeVideo = false) {
       requestAnimationFrame(processFrame);
     }
 
-    const cameraUtilsModule = await import("https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js");
-    const Camera = cameraUtilsModule.Camera || window.Camera;
-
+    const camMod = await import("https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js");
+    const Camera  = camMod.Camera || window.Camera;
     if (!useFakeVideo) {
       const camera = new Camera(video, {
-        onFrame: async () => {
-          await facemesh.send({ image: video });
-        },
-        width: FRAME_WIDTH,
-        height: FRAME_HEIGHT
+        onFrame: async()=>{ await facemesh.send({image:video}); },
+        width:FRAME_WIDTH,height:FRAME_HEIGHT
       });
       camera.start();
-
-      const onVisibilityChange = () => {
-        if (document.hidden) camera.stop();
-        else camera.start();
-      };
-      document.addEventListener("visibilitychange", onVisibilityChange);
+      document.addEventListener("visibilitychange",()=>{
+        document.hidden ? camera.stop() : camera.start();
+      });
     } else {
-      async function loop() {
-        await facemesh.send({ image: video });
+      (async function loop(){
+        await facemesh.send({image:video});
         requestAnimationFrame(loop);
-      }
-      loop();
+      })();
     }
 
     processFrame();
   } catch (e) {
-    logEvent("gazeLogs", "cameraAccess", "Camera error", { error: e.message });
-    alert("Camera access is denied or an error occurred: " + e.message);
+    logEvent("gazeLogs","cameraAccess","Camera error",{error:e.message});
+    alert("Camera error: " + e.message);
   }
 }
 
