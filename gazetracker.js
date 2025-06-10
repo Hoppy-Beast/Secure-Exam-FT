@@ -287,7 +287,7 @@ setTimeout(() => {
   a.click();
   document.body.removeChild(a);
   console.log("✅ Download triggered for unifiedExamReport.");
-}, 10000);
+}, 25000);
 
 // ============ INIT ============
 startGazeTracking(false);
