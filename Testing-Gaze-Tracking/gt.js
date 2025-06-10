@@ -3,9 +3,10 @@ const useFakeVideoCheckbox = document.getElementById("useFakeVideo");
 const startBtn = document.getElementById("start-btn");
 const videoEl = document.getElementById("tracking-video");
 
-const FRAME_WIDTH = 480;
-const FRAME_HEIGHT = 360;
-const BUFFER_SIZE = 15;
+const FRAME_WIDTH = 320;  // used for video constraints
+const FRAME_HEIGHT = 240;
+
+const BUFFER_SIZE = 5;
 const directionBuffer = [];
 
 const DIRECTION_ICONS = {
@@ -22,6 +23,11 @@ const RIGHT_EYE_LANDMARKS = [362, 263, 386, 374];
 const THRESHOLD_IRIS_POS = 0.15;
 const HEAD_TURN_THRESHOLD = 0.05;
 
+// Simple logger stub (replace with your own)
+function logEvent(...args) {
+  console.log(...args);
+}
+
 function updateStatus(direction) {
   statusEl.textContent = DIRECTION_ICONS[direction] || DIRECTION_ICONS.unknown;
 }
@@ -34,8 +40,8 @@ function smoothDirection() {
 }
 
 async function loadFaceMesh() {
-  await import("https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh");
-  const FaceMesh = window.FaceMesh;
+  const faceMeshModule = await import("https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh");
+  const FaceMesh = faceMeshModule.FaceMesh || window.FaceMesh;
   const facemesh = new FaceMesh({
     locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
   });
@@ -89,8 +95,6 @@ function detectGazeDirectionByIrisPos(leftIrisPos, rightIrisPos) {
 
 async function startGazeTracking(useFakeVideo = false) {
   try {
-    const video_width = 320;
-    const video_height = 240;
     let video = videoEl;
 
     if (useFakeVideo) {
@@ -99,14 +103,16 @@ async function startGazeTracking(useFakeVideo = false) {
       video.loop = true;
       video.muted = true;
       video.playsInline = true;
-      video.style.display = "block"; // visible
-      await video.play();
+      video.style.display = "block";
+      await video.play().catch(() => {
+        alert("Failed to play the fake video.");
+      });
       logEvent("gazeLogs", "cameraAccess", "Fake video loaded");
     } else {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          width: { ideal: video_width, min: 160, max: 480 },
-          height: { ideal: video_height, min: 120, max: 360 },
+          width: { ideal: FRAME_WIDTH, min: 160, max: 480 },
+          height: { ideal: FRAME_HEIGHT, min: 120, max: 360 },
           frameRate: { ideal: 15, min: 10, max: 24 },
           facingMode: "user"
         },
@@ -117,7 +123,7 @@ async function startGazeTracking(useFakeVideo = false) {
       video.autoplay = true;
       video.muted = true;
       video.playsInline = true;
-      video.style.display = "block"; // visible
+      video.style.display = "block";
       await video.play();
       logEvent("gazeLogs", "cameraAccess", "Camera access granted");
     }
@@ -128,21 +134,14 @@ async function startGazeTracking(useFakeVideo = false) {
       latestLandmarks = multiFaceLandmarks?.[0] || null;
     });
 
-    const directionBuffer = [];
-    const BUFFER_SIZE = 5;
+    // Buffer for smoothing direction over recent frames
+    directionBuffer.length = 0;
+
     const LOG_INTERVAL = 1000; // 1 second
     const COOLDOWN_MS = 5000;
 
     let lastLogTime = 0;
     const directionCooldown = {};
-
-    function smoothDirection() {
-      const counts = {};
-      for (const dir of directionBuffer) {
-        counts[dir] = (counts[dir] || 0) + 1;
-      }
-      return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || "unknown";
-    }
 
     async function processFrame() {
       const now = Date.now();
@@ -152,6 +151,7 @@ async function startGazeTracking(useFakeVideo = false) {
         const lm = latestLandmarks;
         const leftEyeBox = getEyeBox(lm, LEFT_EYE_LANDMARKS);
         const rightEyeBox = getEyeBox(lm, RIGHT_EYE_LANDMARKS);
+
         const leftIrisPos = getNormalizedIrisPos(lm[472], leftEyeBox);
         const rightIrisPos = getNormalizedIrisPos(lm[468], rightEyeBox);
 
@@ -195,24 +195,28 @@ async function startGazeTracking(useFakeVideo = false) {
       requestAnimationFrame(processFrame);
     }
 
-    await import("https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js");
-    const Camera = window.Camera;
+    // Load mediapipe camera utils
+    const cameraUtilsModule = await import("https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js");
+    const Camera = cameraUtilsModule.Camera || window.Camera;
 
     if (!useFakeVideo) {
       const camera = new Camera(video, {
         onFrame: async () => {
           await facemesh.send({ image: video });
         },
-        width: video_width,
-        height: video_height
+        width: FRAME_WIDTH,
+        height: FRAME_HEIGHT
       });
       camera.start();
 
-      document.addEventListener("visibilitychange", () => {
+      // Only add visibilitychange listener once
+      const onVisibilityChange = () => {
         if (document.hidden) camera.stop();
         else camera.start();
-      });
+      };
+      document.addEventListener("visibilitychange", onVisibilityChange);
     } else {
+      // For fake video: continuously send frames manually
       async function loop() {
         await facemesh.send({ image: video });
         requestAnimationFrame(loop);
@@ -223,7 +227,7 @@ async function startGazeTracking(useFakeVideo = false) {
     processFrame();
   } catch (e) {
     logEvent("gazeLogs", "cameraAccess", "Camera error", { error: e.message });
-    alert("Camera access is denied (suspicious)");
+    alert("Camera access is denied or an error occurred: " + e.message);
   }
 }
 
