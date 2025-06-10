@@ -110,7 +110,7 @@ async function startGazeTracking(useFakeVideo = false) {
     videoEl.height = FRAME_HEIGHT;
 
     if (useFakeVideo) {
-      videoEl.src = "/gaze-tracking-sample.mp4";
+      videoEl.src = "/Secure-Exam-FT/gaze-tracking-sample.mp4";
       await videoEl.play();
     } else {
       const stream = await navigator.mediaDevices.getUserMedia({
