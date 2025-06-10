@@ -104,6 +104,8 @@ The system maintains two main log categories:
 - Show a message when a student breaks a rule: "Warning! You are under observation."
 - Even if tracking isn't real-time via human, perceived monitoring has psychological effect
 
+❗ Leaderboard Hide  
+- পরীক্ষার চলাকালীন স্কোর ও লিডারবোর্ড হাইড রাখা।  
 
 ============================
 📦 Additional Notes:
