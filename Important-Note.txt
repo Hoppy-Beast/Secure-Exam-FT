@@ -33,7 +33,7 @@
    - Smooths gaze data over a buffer of recent frames for stability
    - Detects gaze direction (center, left, right, up, down, unknown)
    - Logs gaze direction with timestamps and cooldown to avoid duplicate logs
-   - Automatically exports gaze and exam logs as JSON after 10 seconds (demo/test)
+   - Automatically exports gaze and exam logs as JSON after 25 seconds (demo/test)
 
 ============================
 📄 Logging: Structure and Content
@@ -56,7 +56,7 @@ The system maintains two main log categories:
   }
 }
 
-➡ Logs are persisted in `localStorage` with expiration (30 seconds TTL)  
+➡ Logs are persisted in `localStorage` with expiration (30 seconds TTL)  ( change to 20 min or 30 min as needed )
 ➡ Logs are merged and cleaned regularly to remove stale data  
 ➡ Logs are saved under keys: `examLogs` and `gazeLogs`  
 
