@@ -110,7 +110,7 @@ async function startGazeTracking(useFakeVideo = false) {
     videoEl.height = FRAME_HEIGHT;
 
     if (useFakeVideo) {
-      videoEl.src = "/Secure-Exam-FT/gaze-tracking-sample.mp4";
+      videoEl.src = "/gaze-tracking-sample.mp4";
       await videoEl.play();
     } else {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -195,15 +195,15 @@ async function startGazeTracking(useFakeVideo = false) {
     }
 
     if (!useFakeVideo) {
-      const Camera = (await import("https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js")).Camera;
-      const camera = new Camera(videoEl, {
+      const camera = new window.Camera(video, {
         onFrame: async () => {
-          await facemesh.send({ image: videoEl });
+          await facemesh.send({ image: video });
         },
-        width: FRAME_WIDTH,
-        height: FRAME_HEIGHT,
+        width: 320,
+        height: 240
       });
       camera.start();
+
 
       document.addEventListener("visibilitychange", () => {
         if (document.hidden) camera.stop();
