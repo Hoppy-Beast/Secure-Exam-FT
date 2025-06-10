@@ -107,7 +107,7 @@ async function startGazeTracking(useFakeVideo = false) {
   try {
     let video = videoEl;
     if (useFakeVideo) {
-      video.src = "/Secure-Exam_FT/gaze-tracking-sample.mp4";
+      video.src = "/Secure-Exam-FT/gaze-tracking-sample.mp4";
       video.autoplay = video.loop = video.muted = video.playsInline = true;
       video.style.display = "block";
       await video.play().catch(() => alert("Failed to play fake video."));
