@@ -121,6 +121,12 @@ async function startGazeTracking(useFakeVideo = false) {
     document.body.appendChild(canvas);
     const ctx = canvas.getContext("2d");
 
+    async function feedLoop() {
+      await facemesh.send({ image: videoEl });
+      requestAnimationFrame(feedLoop);
+    }
+    feedLoop();
+
     async function processFrame() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
@@ -159,30 +165,6 @@ async function startGazeTracking(useFakeVideo = false) {
 
       updateStatus(smoothDirection());
       requestAnimationFrame(processFrame);
-    }
-
-      if (!useFakeVideo) {
-        const { Camera } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js");
-      
-        const camera = new Camera(videoEl, {
-          onFrame: async () => {
-            await facemesh.send({ image: videoEl });
-          },
-          width: FRAME_WIDTH,
-          height: FRAME_HEIGHT
-        });
-      
-        camera.start();
-      
-        document.addEventListener("visibilitychange", () => {
-          document.hidden ? camera.stop() : camera.start();
-        });
-      } else {
-      async function loop() {
-        await facemesh.send({ image: videoEl });
-        requestAnimationFrame(loop);
-      }
-      loop();
     }
 
     processFrame();
