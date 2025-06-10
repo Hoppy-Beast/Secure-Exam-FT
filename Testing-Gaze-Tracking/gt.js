@@ -161,21 +161,23 @@ async function startGazeTracking(useFakeVideo = false) {
       requestAnimationFrame(processFrame);
     }
 
-    if (!useFakeVideo) {
-      const camera = new window.Camera(videoEl, {
-        onFrame: async () => {
-          await facemesh.send({ image: videoEl });
-        },
-        width: FRAME_WIDTH,
-        height: FRAME_HEIGHT
-      });
-
-      camera.start();
-
-      document.addEventListener("visibilitychange", () => {
-        document.hidden ? camera.stop() : camera.start();
-      });
-    } else {
+      if (!useFakeVideo) {
+        const { Camera } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js");
+      
+        const camera = new Camera(videoEl, {
+          onFrame: async () => {
+            await facemesh.send({ image: videoEl });
+          },
+          width: FRAME_WIDTH,
+          height: FRAME_HEIGHT
+        });
+      
+        camera.start();
+      
+        document.addEventListener("visibilitychange", () => {
+          document.hidden ? camera.stop() : camera.start();
+        });
+      } else {
       async function loop() {
         await facemesh.send({ image: videoEl });
         requestAnimationFrame(loop);
