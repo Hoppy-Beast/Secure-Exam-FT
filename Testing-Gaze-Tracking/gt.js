@@ -3,7 +3,7 @@ const useFakeVideoCheckbox = document.getElementById("useFakeVideo");
 const startBtn = document.getElementById("start-btn");
 const videoEl = document.getElementById("tracking-video");
 
-const FRAME_WIDTH = 320;  // used for video constraints
+const FRAME_WIDTH = 320;
 const FRAME_HEIGHT = 240;
 
 const BUFFER_SIZE = 5;
@@ -20,10 +20,10 @@ const DIRECTION_ICONS = {
 
 const LEFT_EYE_LANDMARKS = [33, 133, 159, 145];
 const RIGHT_EYE_LANDMARKS = [362, 263, 386, 374];
-const THRESHOLD_IRIS_POS = 0.15;
+
+const THRESHOLD_IRIS_POS = 0.2; // More forgiving center detection
 const HEAD_TURN_THRESHOLD = 0.05;
 
-// Simple logger stub (replace with your own)
 function logEvent(...args) {
   console.log(...args);
 }
@@ -85,10 +85,21 @@ function detectGazeDirectionByIrisPos(leftIrisPos, rightIrisPos) {
   const avgX = (leftIrisPos.x + rightIrisPos.x) / 2;
   const avgY = (leftIrisPos.y + rightIrisPos.y) / 2;
 
-  if (avgY < 0.5 - THRESHOLD_IRIS_POS) return "up";
-  if (avgY > 0.5 + THRESHOLD_IRIS_POS) return "down";
-  if (avgX < 0.5 - THRESHOLD_IRIS_POS) return "left";
-  if (avgX > 0.5 + THRESHOLD_IRIS_POS) return "right";
+  const xOffset = avgX - 0.5;
+  const yOffset = avgY - 0.5;
+
+  // console.log("avgX:", avgX.toFixed(2), "avgY:", avgY.toFixed(2));
+
+  const margin = THRESHOLD_IRIS_POS;
+
+  if (Math.abs(xOffset) < margin && Math.abs(yOffset) < margin) {
+    return "center";
+  }
+
+  if (yOffset < -margin) return "up";
+  if (yOffset > margin) return "down";
+  if (xOffset < -margin) return "left";
+  if (xOffset > margin) return "right";
 
   return "center";
 }
@@ -104,9 +115,7 @@ async function startGazeTracking(useFakeVideo = false) {
       video.muted = true;
       video.playsInline = true;
       video.style.display = "block";
-      await video.play().catch(() => {
-        alert("Failed to play the fake video.");
-      });
+      await video.play().catch(() => alert("Failed to play the fake video."));
       logEvent("gazeLogs", "cameraAccess", "Fake video loaded");
     } else {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -134,12 +143,9 @@ async function startGazeTracking(useFakeVideo = false) {
       latestLandmarks = multiFaceLandmarks?.[0] || null;
     });
 
-    // Buffer for smoothing direction over recent frames
     directionBuffer.length = 0;
-
-    const LOG_INTERVAL = 1000; // 1 second
+    const LOG_INTERVAL = 1000;
     const COOLDOWN_MS = 5000;
-
     let lastLogTime = 0;
     const directionCooldown = {};
 
@@ -195,7 +201,6 @@ async function startGazeTracking(useFakeVideo = false) {
       requestAnimationFrame(processFrame);
     }
 
-    // Load mediapipe camera utils
     const cameraUtilsModule = await import("https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js");
     const Camera = cameraUtilsModule.Camera || window.Camera;
 
@@ -209,14 +214,12 @@ async function startGazeTracking(useFakeVideo = false) {
       });
       camera.start();
 
-      // Only add visibilitychange listener once
       const onVisibilityChange = () => {
         if (document.hidden) camera.stop();
         else camera.start();
       };
       document.addEventListener("visibilitychange", onVisibilityChange);
     } else {
-      // For fake video: continuously send frames manually
       async function loop() {
         await facemesh.send({ image: video });
         requestAnimationFrame(loop);
