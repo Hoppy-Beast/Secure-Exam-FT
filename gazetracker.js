@@ -225,6 +225,8 @@ async function startGazeTracking(useFakeVideo = false) {
     const LOG_INTERVAL = 1000, COOLDOWN_MS = 5000;
     let lastLogTime = 0, directionCooldown = {};
 
+    let lastLoggedDirection = null;  // keep track of last logged gaze direction
+
     async function processFrame() {
       const now = Date.now();
       let dir = "unknown";
@@ -255,19 +257,26 @@ async function startGazeTracking(useFakeVideo = false) {
 
       if (
         now - lastLogTime >= LOG_INTERVAL &&
-        smoothDir !== "unknown" &&
         (!directionCooldown[smoothDir] || now - directionCooldown[smoothDir] > COOLDOWN_MS)
       ) {
-        const msg = smoothDir === "center"
-          ? "User is looking at the screen"
-          : `User is looking ${smoothDir}`;
-        logEvent("gazeLogs", "gaze", msg, { direction: smoothDir });
-        directionCooldown[smoothDir] = now;
-        lastLogTime = now;
+        // Only log if the direction changed
+        if (smoothDir !== lastLoggedDirection) {
+          const msg = smoothDir === "center"
+            ? "User is looking at the screen"
+            : smoothDir === "unknown"
+              ? "User gaze direction unknown"
+              : `User is looking ${smoothDir}`;
+
+          logEvent("gazeLogs", "gaze", msg, { direction: smoothDir });
+          directionCooldown[smoothDir] = now;
+          lastLogTime = now;
+          lastLoggedDirection = smoothDir;  // update last logged direction
+        }
       }
 
       requestAnimationFrame(processFrame);
     }
+
 
     processFrame();
 
