@@ -149,7 +149,7 @@ function smoothDirection() {
 async function startGazeTracking(useFakeVideo = false) {
   try {
     let video;
-    
+
     if (useFakeVideo) {
       video = document.createElement("video");
       video.src = "gaze-tracking-sample.mp4";
@@ -161,7 +161,17 @@ async function startGazeTracking(useFakeVideo = false) {
       await video.play();
       logEvent("gazeLogs", "cameraAccess", "Fake video loaded");
     } else {
-      const stream = await navigator.mediaDevices.getUserMedia({ /*...*/ });
+      
+      
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: FRAME_WIDTH, min: 160, max: 480 },     // flexible between 160 and 480, ideally 320
+          height: { ideal: FRAME_HEIGHT, min: 120, max: 360 },    // flexible height range
+          frameRate: { ideal: 15, min: 10, max: 24 },    // low-medium fps to balance smoothness & perf
+          facingMode: "user"                             // front camera if on mobile devices
+        },
+        audio: false
+      });
       video = document.createElement("video");
       video.srcObject = stream;
       video.autoplay = true;
@@ -277,7 +287,7 @@ setTimeout(() => {
   a.click();
   document.body.removeChild(a);
   console.log("✅ Download triggered for unifiedExamReport.");
-}, 25000);
+}, 10000);
 
 // ============ INIT ============
 startGazeTracking(false);
